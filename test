@@ -1,0 +1,202 @@
+
+import sys
+import toolutils
+
+outputitem = None
+inputindex = -1
+inputitem = None
+outputindex = -1
+
+num_args = 1
+h_extra_args = ''
+pane = toolutils.activePane(kwargs)
+if not isinstance(pane, hou.NetworkEditor):
+    pane = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+    if pane is None:
+       hou.ui.displayMessage(
+               'Cannot create node: cannot find any network pane')
+       sys.exit(0)
+else: # We're creating this tool from the TAB menu inside a network editor
+    pane_node = pane.pwd()
+    if "outputnodename" in kwargs and "inputindex" in kwargs:
+        outputitem = pane_node.item(kwargs["outputnodename"])
+        inputindex = kwargs["inputindex"]
+        h_extra_args += 'set arg4 = "' + kwargs["outputnodename"] + '"\n'
+        h_extra_args += 'set arg5 = "' + str(inputindex) + '"\n'
+        num_args = 6
+    if "inputnodename" in kwargs and "outputindex" in kwargs:
+        inputitem = pane_node.item(kwargs["inputnodename"])
+        outputindex = kwargs["outputindex"]
+        h_extra_args += 'set arg6 = "' + kwargs["inputnodename"] + '"\n'
+        h_extra_args += 'set arg9 = "' + str(outputindex) + '"\n'
+        num_args = 9 
+    if "autoplace" in kwargs:
+        autoplace = kwargs["autoplace"]
+    else:
+        autoplace = False
+    # If shift-clicked we want to auto append to the current
+    # node
+    if "shiftclick" in kwargs and kwargs["shiftclick"]:
+        if inputitem is None:
+            inputitem = pane.currentNode()
+            outputindex = 0
+    if "nodepositionx" in kwargs and             "nodepositiony" in kwargs:
+        try:
+            pos = [ float( kwargs["nodepositionx"] ),
+                    float( kwargs["nodepositiony"] )]
+        except:
+            pos = None
+    else:
+        pos = None
+
+    if not autoplace and not pane.listMode():
+        if pos is not None:
+            pass
+        elif outputitem is None:
+            pos = pane.selectPosition(inputitem, outputindex, None, -1)
+        else:
+            pos = pane.selectPosition(inputitem, outputindex,
+                                      outputitem, inputindex)
+
+    if pos is not None:
+        if "node_bbox" in kwargs:
+            size = kwargs["node_bbox"]
+            pos[0] -= size[0] / 2
+            pos[1] -= size[1] / 2
+        else:
+            pos[0] -= 0.573625
+            pos[1] -= 0.220625
+        h_extra_args += 'set arg2 = "' + str(pos[0]) + '"\n'
+        h_extra_args += 'set arg3 = "' + str(pos[1]) + '"\n'
+h_extra_args += 'set argc = "' + str(num_args) + '"\n'
+            
+pane_node = pane.pwd()
+child_type = pane_node.childTypeCategory().nodeTypes()
+
+if 'QR_animCenterWorld' not in child_type:
+   hou.ui.displayMessage(
+           'Cannot create node: incompatible pane network type')
+   sys.exit(0)
+
+# First clear the node selection
+pane_node.setSelected(False, True)
+
+h_path = pane_node.path()
+h_preamble = 'set arg1 = "' + h_path + '"\n'
+h_cmd = r''' 
+if ($argc < 2 || "$arg2" == "") then
+   set arg2 = 0
+endif
+if ($argc < 3 || "$arg3" == "") then
+   set arg3 = 0
+endif
+# Automatically generated script
+# $arg1 - the path to add this node
+# $arg2 - x position of the tile
+# $arg3 - y position of the tile
+# $arg4 - input node to wire to
+# $arg5 - which input to wire to
+# $arg6 - output node to wire to
+# $arg7 - the type of this node
+# $arg8 - the node is an indirect input
+# $arg9 - index of output from $arg6
+
+\set noalias = 1
+set saved_path = `execute("oppwf")`
+opcf $arg1
+
+# Node $_obj_geo2_QR_animCenterWorld (Sop/QR_animCenterWorld)
+set _obj_geo2_QR_animCenterWorld = `run("opadd -e -n -u -v QR_animCenterWorld QR_animCenterWorld")`
+oplocate -x `$arg2 + 0` -y `$arg3 + 0` $_obj_geo2_QR_animCenterWorld
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -F on -c on -e on -b off $_obj_geo2_QR_animCenterWorld
+opexprlanguage -s hscript $_obj_geo2_QR_animCenterWorld
+opuserdata -n '___Version___' -v '2.0' $_obj_geo2_QR_animCenterWorld
+opcf $_obj_geo2_QR_animCenterWorld
+
+# Node $_obj_geo2_QR_animCenterWorld_move_c_world (Sop/attribwrangle)
+set _obj_geo2_QR_animCenterWorld_move_c_world = `run("opadd -e -n -v attribwrangle move_c_world")`
+oplocate -x `$arg2 + -0.292574` -y `$arg3 + 5.1908599999999998` $_obj_geo2_QR_animCenterWorld_move_c_world
+opparm $_obj_geo2_QR_animCenterWorld_move_c_world  bindings ( 0 ) groupbindings ( 0 )
+opparm $_obj_geo2_QR_animCenterWorld_move_c_world snippet ( '// Get center of the oject bounding box (centroid)\nvector min = {0, 0, 0};\nvector max = {0, 0, 0};\ngetpointbbox(0, min, max);\nvector centroid = (max + min)/2.0;\n\n// Build and apply transformation matrix\nvector translate = centroid;\nvector rotate = {0,0,0};\nvector scale = {1,1,1};\nmatrix xform = invert(maketransform(0, 0, translate, rotate, scale));\n@P *= xform;\n\n// Store transformation matrix in attribute\n4@xform_matrix = xform;' )
+opcolor -c 0.99599999189376831 0.93300002813339233 0 $_obj_geo2_QR_animCenterWorld_move_c_world
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -F off -c on -e on -b off $_obj_geo2_QR_animCenterWorld_move_c_world
+opexprlanguage -s hscript $_obj_geo2_QR_animCenterWorld_move_c_world
+opuserdata -n '___Version___' -v '' $_obj_geo2_QR_animCenterWorld_move_c_world
+opuserdata -n '___toolcount___' -v '9' $_obj_geo2_QR_animCenterWorld_move_c_world
+opuserdata -n '___toolid___' -v 'move_c_world' $_obj_geo2_QR_animCenterWorld_move_c_world
+
+# Node $_obj_geo2_QR_animCenterWorld_move_back_pos (Sop/attribwrangle)
+set _obj_geo2_QR_animCenterWorld_move_back_pos = `run("opadd -e -n -v attribwrangle move_back_pos")`
+oplocate -x `$arg2 + 2.4224299999999999` -y `$arg3 + 5.1908599999999998` $_obj_geo2_QR_animCenterWorld_move_back_pos
+opparm $_obj_geo2_QR_animCenterWorld_move_back_pos  bindings ( 0 ) groupbindings ( 0 )
+opparm $_obj_geo2_QR_animCenterWorld_move_back_pos snippet ( '@P *= invert(4@xform_matrix);' )
+opcolor -c 0.99599999189376831 0.93300002813339233 0 $_obj_geo2_QR_animCenterWorld_move_back_pos
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -F off -c on -e on -b off $_obj_geo2_QR_animCenterWorld_move_back_pos
+opexprlanguage -s hscript $_obj_geo2_QR_animCenterWorld_move_back_pos
+opuserdata -n '___Version___' -v '' $_obj_geo2_QR_animCenterWorld_move_back_pos
+opuserdata -n '___toolcount___' -v '9' $_obj_geo2_QR_animCenterWorld_move_back_pos
+opuserdata -n '___toolid___' -v 'move_c_world' $_obj_geo2_QR_animCenterWorld_move_back_pos
+opcf ..
+opcf $_obj_geo2_QR_animCenterWorld
+
+# Node $_obj_geo2_QR_animCenterWorld_output0 (Sop/output)
+set _obj_geo2_QR_animCenterWorld_output0 = `run("opadd -e -n -v output output0")`
+oplocate -x `$arg2 + -0.157499` -y `$arg3 + 1.8307` $_obj_geo2_QR_animCenterWorld_output0
+opcolor -c 1 0 0 $_obj_geo2_QR_animCenterWorld_output0
+opset -d on -r on -h off -f off -y off -t off -l off -s off -u off -F off -c on -e on -b off $_obj_geo2_QR_animCenterWorld_output0
+opexprlanguage -s hscript $_obj_geo2_QR_animCenterWorld_output0
+opuserdata -n '___Version___' -v '18.5.499' $_obj_geo2_QR_animCenterWorld_output0
+
+# Node $_obj_geo2_QR_animCenterWorld_switch (Sop/switch)
+set _obj_geo2_QR_animCenterWorld_switch = `run("opadd -e -n -v switch switch")`
+oplocate -x `$arg2 + -0.157499` -y `$arg3 + 3.0929600000000002` $_obj_geo2_QR_animCenterWorld_switch
+chblockbegin
+chadd -t 0 0 $_obj_geo2_QR_animCenterWorld_switch input
+chkey -t 0 -v 0 -m 0 -a 0 -A 0 -T a  -F 'ch("../action")' $_obj_geo2_QR_animCenterWorld_switch/input
+chblockend
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -F on -c on -e on -b off $_obj_geo2_QR_animCenterWorld_switch
+opexprlanguage -s hscript $_obj_geo2_QR_animCenterWorld_switch
+opuserdata -n '___Version___' -v '18.5.499' $_obj_geo2_QR_animCenterWorld_switch
+
+# Node $_obj_geo2_QR_animCenterWorld_attribdelete1 (Sop/attribdelete)
+set _obj_geo2_QR_animCenterWorld_attribdelete1 = `run("opadd -e -n -v attribdelete attribdelete1")`
+oplocate -x `$arg2 + 2.6119599999999998` -y `$arg3 + 4.06806` $_obj_geo2_QR_animCenterWorld_attribdelete1
+opparm $_obj_geo2_QR_animCenterWorld_attribdelete1 ptdel ( xform_matrix )
+opcolor -c 0.99599999189376831 0.68199998140335083 0.68199998140335083 $_obj_geo2_QR_animCenterWorld_attribdelete1
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -F off -c on -e on -b off $_obj_geo2_QR_animCenterWorld_attribdelete1
+opexprlanguage -s hscript $_obj_geo2_QR_animCenterWorld_attribdelete1
+opuserdata -n '___Version___' -v '' $_obj_geo2_QR_animCenterWorld_attribdelete1
+oporder -e move_c_world move_back_pos output0 switch attribdelete1 
+opcf ..
+opset -p on $_obj_geo2_QR_animCenterWorld
+
+opcf $arg1
+opcf $_obj_geo2_QR_animCenterWorld
+opwire -n -i 0 -0 $_obj_geo2_QR_animCenterWorld_move_c_world
+opwire -n -i 0 -0 $_obj_geo2_QR_animCenterWorld_move_back_pos
+opwire -n $_obj_geo2_QR_animCenterWorld_switch -0 $_obj_geo2_QR_animCenterWorld_output0
+opwire -n $_obj_geo2_QR_animCenterWorld_move_c_world -0 $_obj_geo2_QR_animCenterWorld_switch
+opwire -n $_obj_geo2_QR_animCenterWorld_attribdelete1 -1 $_obj_geo2_QR_animCenterWorld_switch
+opwire -n $_obj_geo2_QR_animCenterWorld_move_back_pos -0 $_obj_geo2_QR_animCenterWorld_attribdelete1
+opcf ..
+
+set oidx = 0
+if ($argc >= 9 && "$arg9" != "") then
+    set oidx = $arg9
+endif
+
+if ($argc >= 5 && "$arg4" != "") then
+    set output = $_obj_geo2_QR_animCenterWorld
+    opwire -n $output -$arg5 $arg4
+endif
+if ($argc >= 6 && "$arg6" != "") then
+    set input = $_obj_geo2_QR_animCenterWorld
+    if ($arg8) then
+        opwire -n -i $arg6 -0 $input
+    else
+        opwire -n -o $oidx $arg6 -0 $input
+    endif
+endif
+opcf $saved_path
+'''
+hou.hscript(h_preamble + h_extra_args + h_cmd)
